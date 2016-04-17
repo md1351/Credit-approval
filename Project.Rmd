@@ -1,0 +1,313 @@
+---
+title: "MTh642-Project"
+output: word_document
+---
+#I am trying to load and clean, transform the data
+load("/Users/Nestor/Downloads/classification/Cards/train/1.RData")
+str(train)
+names(train)
+sum(is.na(train))
+train=na.omit(train)
+attach(train)
+Male=as.numeric(V1)
+male=as.numeric(Male==1)
+Age=as.numeric(V2)
+wkage=Age/12
+debt=as.numeric(V3)
+married=as.numeric(V4=="y")
+bankcustomer=as.numeric(V5=="g")
+educationlevel=as.character(V6)
+ethnicity=as.character(V7)
+yearsemployed=as.numeric(V8)
+priordefault=as.numeric(V9)
+priordefault=as.numeric(priordefault==1)
+employed=as.numeric(V10)
+employed=as.numeric(employed==1)
+creditscore=as.numeric(V11)
+driverslicense=as.numeric(V12=="t")
+citizen=as.numeric(V13=="g")
+zipcode=as.character(V14)
+income=as.numeric(V15)
+approved=as.character(train$Class)
+approved=as.numeric(approved=="+")
+detach(train)
+credit=data.frame(male,wkage,debt,married,bankcustomer,educationlevel,ethnicity,yearsemployed,priordefault,employed,creditscore,driverslicense,citizen,zipcode,income,approved)
+sum(is.na(credit))
+dim(credit)
+names(credit)
+str(credit)
+attach(credit)
+#Summary about the data
+summary(credit)
+pairs(credit)
+credit.num=data.frame(wkage,debt,yearsemployed,creditscore,income)
+cor(credit.num)
+#Logistic Regression
+#Logisitc regression with all variables
+glm.fit=glm(approved~male+wkage+debt+married+bankcustomer+yearsemployed+priordefault+employed+creditscore+driverslicense+citizen+income,data=credit,family=binomial)
+summary(glm.fit)
+summary(glm.fit)$coef
+summary(glm.fit)$coef[,4]
+##Predict
+glm.probs=predict(glm.fit,type="response")
+glm.probs[1:10]
+##create a vector of class predictions based on whether the predicted probability of a market increase is greater than or less than 0.5
+glm.pred=rep("0",590)
+glm.pred[glm.probs>.5]="1"
+table(glm.pred,approved)
+mean(glm.pred==approved)
+##find out test error rate by held out certain part of data
+train=(married==1)
+credit.single=credit[!train,]
+dim(credit.single)
+approved.single=approved[!train]
+length(approved.single)
+glm.fit=glm(approved~male+wkage+debt+married+bankcustomer+yearsemployed+priordefault+employed+creditscore+driverslicense+citizen+income,data=credit,family=binomial,subset=train)
+glm.probs=predict(glm.fit,credit.single,type="response")
+glm.pred=rep("0",455)
+glm.pred[glm.probs>.5]="1"
+table(glm.pred,approved.single)
+mean(glm.pred==approved.single)
+mean(glm.pred!=approved.single)
+##Remove predictors with high p-values
+glm.fit=glm(approved~male+wkage+debt+married+bankcustomer+yearsemployed+priordefault+employed+creditscore+driverslicense+citizen+income,data=credit,family=binomial,subset=train)
+summary(glm.fit)
+glm.probs=predict(glm.fit,credit.single,type="response")
+glm.pred=rep("0",455)
+glm.pred[glm.probs>.5]="1"
+table(glm.pred,approved.single)
+mean(glm.pred==approved.single)
+185/(185+44)
+#Choosing Among Models Using the Validation Set Approach and Cross-Validation
+library(leaps)
+train=sample(c(TRUE,FALSE),nrow(credit),rep=TRUE)
+test=(!train)
+regfit.best=regsubsets(approved~male+wkage+debt+married+bankcustomer+yearsemployed+priordefault+employed+creditscore+driverslicense+citizen+income,data=credit[train,],nvmax=15)
+test.mat=model.matrix(approved~.,data=credit[test,])
+val.errors=rep(NA,12)
+for(i in 1:12){
+coefi=coef(regfit.best,id=i)
+pred=test.mat[,names(coefi)]%*%coefi
+val.errors[i]=mean((credit$approved[test]-pred)^2)
+}
+val.errors
+which.min(val.errors)
+coef(regfit.best,10)
+predict.regsubsets=function(object,newdata,id,...){
+form=as.formula(object$call[[2]])
+mat=model.matrix(form,newdata)
+coefi=coef(object,id=id)
+xvars=names(coefi)
+mat[,xvars]%*%coefi
+}
+regfit.best=regsubsets(approved~male+wkage+debt+married+bankcustomer+yearsemployed+priordefault+employed+creditscore+driverslicense+citizen+income,data=credit,nvmax=15)
+coef(regfit.best,10)
+k=10
+set.seed(1)
+folds=sample(1:k,nrow(credit),replace=TRUE)
+cv.errors=matrix(NA,k,12,dimnames=list(NULL,paste(1:12)))
+for(j in 1:k){
+best.fit=regsubsets(approved~.,data=credit[folds!=j,],nvmax=12,really.big=T)
+for(i in 1:12){
+  pred=predict(best.fit,credit[folds==j,],id=i)
+  cv.errors[j,i]=mean((credit$approved[folds==j]-pred)^2)
+}
+}
+mean.cv.errors=apply(cv.errors,2,mean)
+mean.cv.errors
+par(mfrow=c(1,1))
+plot(mean.cv,errors,type='b')
+#Best subset Method
+library(ISLR)
+library(leaps)
+regfit.full=regsubsets(approved~.,credit,really.big=)
+summary(regfit.full)
+regfit.full=regsubsets(Salary~.,data=Hitters,nvmax=19)
+reg.summary=summary(regfit.full)
+names(reg.summary)
+reg.summary$rsq
+par(mfrow=c(2,2))
+plot(reg.summary$rss,xlab="Number of Variables", ylab="RSS",type="l")
+
+plot(reg.summary$adjr2,xlab="Number of Variables", ylab="Adjusted RSq",type="l")
+which.max(reg.summary$adjr2)
+points(11,reg.summary$adjr2[11],col="red",cex=2,pch=20)
+plot(reg.summary$cp,xlab="Number of Variables", ylab="Cp",type='l')
+which.min(reg.summary$cp)
+points(10,reg.summary$cp[10], col="red",cex=2,pch=20)
+which.min(reg.summary$bic)
+plot(reg.summary$bic, xlab="Number of Variables",ylab="BIC",type='l')
+points(6,reg.summary$bic[6],col="red",cex=2,pch=20)
+par(mfrow=c(1,1))
+
+plot(regfit.full,scale="r2")
+plot(regfit.full,scale="adjr2")
+plot(regfit.full,scale="Cp")
+plot(regfit.full,scale="bic")
+coef(regfit.full,6)
+
+
+#Linear Discriminant Analysis
+library(MASS)
+lda.fit=lda(approved~male+wkage+debt+married+bankcustomer+yearsemployed+priordefault+employed+creditscore+driverslicense+citizen+income,data=credit)
+lda.fit
+plot(lda.fit)
+lda.pred=predict(lda.fit,credit.single)
+names(lda.pred)
+lda.class=lda.pred$class
+table(lda.class,approved.single)
+mean(lda.class==approved.single)
+sum(lda.pred$posterior[,1]>=.5)
+sum(lda.pred$posterior[,1]<.5)
+lda.pred$posterior[1:20,1]
+lda.class[1:20]
+
+#Quadratic Discriminant Analysis
+qda.fit=qda(approved~wkage+debt+bankcustomer+yearsemployed+priordefault+employed+creditscore+driverslicense+citizen+income,data=credit)
+qda.fit
+qda.class=predict(qda.fit,credit.single)$class
+table(qda.class,approved.single)
+mean(qda.class==approved.single)
+
+#K-Nearest Neighbors
+library(class)
+train.X=cbind(priordefault,employed,income)[train,]
+test.X=cbind(priordefault,employed,income)[!train,]
+train.approved=approved[train]
+set.seed(1)
+knn.pred=knn(train.X,test.X,train.approved,k=1)
+table(knn.pred,approved.single)
+(133+192)/(192+96+34+133)
+knn.pred=knn(train.X,test.X,train.approved,k=3)
+table(knn.pred,approved.single)
+mean(knn.pred==approved.single)
+
+#Support Vector Classifier
+x=matrix(rnorm(590*11),ncol=11)
+x[,1]=Age
+x[,2]=bankcustomer
+x[,3]=citizen
+x[,4]=creditscore
+x[,5]=debt
+x[,6]=driverslicense
+x[,7]=employed
+x[,8]=income
+x[,9]=male
+x[,10]=married
+x[,11]=priordefault
+x=matrix(Age,bankcustomer,citizen,creditscore,debt,driverslicense,employed,income,male,married,priordefault)
+approved=as.character(train$Class)
+approved=as.numeric(approved=="+")
+y=approved
+x[y==1,]=x[y==1,]+1
+plot(x,col=(3-y))
+dat=data.frame(x=x,y=as.factor(approved))
+library(e1071)
+svmfit=svm(y~.,data=dat,kernel="linear",cost=10,scale=TRUE)
+plot(svmfit, dat)
+svmfit$index
+summary(svmfit)
+#smaller value of cost parameter
+svmfit=svm(y~.,data=dat,kernel="linear",cost=.1,scale=TRUE)
+plot(svmfit, dat)
+svmfit$index
+#tune() to perform cross-validation
+tune.out=tune(svm,y~.,data=dat,kernel="linear",ranges=list(cost=c(.001,.01,.1,1,5,10,100)))
+summary(tune.out)
+#tune() function stores the best model obtained, which can be accessed
+bestmod=tune.out$best.model
+summary(bestmod)
+#cost=.01
+svmfit=svm(y~.,data=dat,kernel="linear",cost=.01,scale=FALSE)
+testdat=dat[4:40,]
+ypred=predict(svmfit,testdat)
+table(predict=ypred,truth=testdat$y)
+#fit the support vector classifier and plot the resulting hyperplane with large value of cost so that no observation misclassified
+dat=data.frame(x=x,y=as.factor(approved))
+svmfit=svm(y~.,data=dat,kernel="linear",cost=1e5)
+summary(svmfit)
+plot(svmfit,dat)
+svmfit=svm(y~.,data=dat,kernel="linear",cost=1)
+summary(svmfit)
+plot(svmfit,dat)
+
+#Support Vector Machine
+y=approved
+dat=data.frame(x=x,y=as.factor(approved))
+train=sample(590,490)
+svmfit=svm(y~.,data=dat[train,],kernel="radial",gamma=1,cost=1)
+plot(svmfit,dat[-test,])
+summary(svmfit)
+#increase value of cost, reduce number of training errors with a more irrgular decision boundary, at risk of overfitting
+svmfit=svm(y~.,data=dat[train,],kernel="radial",gamma=1,cost=1e5)
+plot(svmfit,dat[-test,],y)
+summary(svmfit)
+#Perform cross-validation using tune() to chose r and cost 
+tune.out=tune(svm,y~.,data=dat[-test,],kernel="radial",ranges=list(cost=c(.1,1,10,100,1000),gamma=c(.5,1,2,3,4)))
+summary(tune.out)
+length(dat[test,"y"])
+a=predict(tune.out$best.model,newx=dat[test,])
+dim(dat[test,])
+svm.best=svm(y~.,data=dat[test,],kernel="radial",gamma=4,cost=10)
+pred=predict(svm.best,newx=dat[test,])
+table(true=dat[test,"y"],pred)
+
+#ROC Curves
+#pred contains a numerical score for each observation, truth contains a vector contains the class label for each observation
+library(ROCR)
+rocplot=function(pred,truth,...){
+predob=prediction(pred,truth)
+perf=performance(predob,"tpr","fpr")
+plot(perf,...)
+}
+svmfit.opt=svm(y~.,data=dat[-test,],kernel="radial",gamma=2,cost=1,decision.values=T)
+fitted=attributes(predict(svmfit.opt,dat[-test,],decision.values=TRUE))$decision.values
+par(mfrow=c(1,2))
+rocplot(fitted,dat[-test,"y"],main="Training Data")
+#increase r to produce a more flexible fit 
+svmfit.flex=svm(y~.,data=dat[-test,],kernel="radial",gamma=50,cost=1,decision.values=T)
+fitted=attributes(predict(svmfit.flex,dat[-test,],decision.values=T))$decision.values
+rocplot(fitted,dat[-test,"y"],add=T,col="red")
+fitted=attributes(predict(svmfit.opt,dat[test,],decision.values=T))$decision.values
+rocplot(fitted,dat[test,"y"],main="Test Data")
+fitted=attributes(predict(svmfit.flex,dat[test,],decision.values=T))$decision.values
+rocplot(fitted,dat[test,"y"],add=T,col="red")
+
+#Fitting Classification trees
+library(tree)
+credit=data.frame(male,wkage,debt,married,bankcustomer,yearsemployed,priordefault,employed,creditscore,driverslicense,citizen,income)
+#create a binary variable
+approved=ifelse(approved==0,"No","Yes")
+#merge high with the rest
+credit=data.frame(credit,approved)
+#tree() function to fit a classification tree
+tree.credit=tree(approved~.,credit)
+#summary list the variables that are used as internal nodes in the tree,the number of terminal nodes, and the training error rate
+summary(tree.credit)
+plot(tree.credit)
+#text() function display the node labels,pretty=0 to include the category names
+text(tree.credit,pretty=0)
+tree.credit
+#test with prediction
+train=sample(1:nrow(credit),200)
+credit.test=credit[-train,]
+approved.test=approved[-train]
+tree.credit=tree(approved~.,credit,subset=train)
+tree.pred=predict(tree.credit,credit.test,type="class")
+table(tree.pred,approved.test)
+mean(tree.pred==approved.test)
+#Consider whether pruning the tree might lead to improved results
+cv.credit=cv.tree(tree.credit,FUN=prune.misclass)
+names(cv.credit)
+cv.credit
+#plot the error rate as a function of both size and k
+par(mfrow=c(1,2))
+plot(cv.credit$size,cv.credit$dev,type="b")
+plot(cv.credit$k,cv.credit$dev,type="b")
+#prune.misclass() function to prune the tree to obtain the two-node tree
+prune.credit=prune.misclass(tree.credit,best=2)
+plot(prune.credit)
+text(prune.credit,pretty=0)
+tree.pred=predict(prune.credit,credit.test,type="class")
+table(tree.pred,approved.test)
+mean(tree.pred==approved.test)
